@@ -20,6 +20,8 @@ import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any
 
+import threading
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from data.sensor_simulator import generate_sensor_stream
 from backend.detector import AnomalyDetector
@@ -28,31 +30,41 @@ from backend.detector import AnomalyDetector
 detector = AnomalyDetector()
 df_global: pd.DataFrame = pd.DataFrame()
 anomaly_log: List[Dict] = []
+training_in_progress = False
+training_error = None
 
 
 def bootstrap():
-    global df_global, anomaly_log
-    print("🔄 Generating sensor data...")
-    df_global = generate_sensor_stream(n_points=500)
-    print("🧠 Training LSTM models (this takes ~30s on CPU)...")
-    thresholds = detector.train(df_global)
-    print(f"✅ Models trained. Thresholds: {thresholds}")
+    global df_global, anomaly_log, training_in_progress, training_error
+    training_in_progress = True
+    try:
+        print("🔄 Generating sensor data...")
+        df_global = generate_sensor_stream(n_points=500)
+        print("🧠 Training LSTM models in background thread...")
+        thresholds = detector.train(df_global)
+        print(f"✅ Models trained. Thresholds: {thresholds}")
 
-    # Pre-populate anomaly log from ground-truth labels
-    anomaly_rows = df_global[df_global["anomaly"] == 1].copy()
-    for _, row in anomaly_rows.iterrows():
-        anomaly_log.append({
-            "timestamp": row["timestamp"].isoformat(),
-            "sensor": row["anomaly_type"].split("_")[0],
-            "anomaly_type": row["anomaly_type"],
-            "severity": "critical" if "spike" in row["anomaly_type"] else "warning",
-        })
-    print(f"📋 Loaded {len(anomaly_log)} historical anomaly events")
+        # Pre-populate anomaly log from ground-truth labels
+        anomaly_rows = df_global[df_global["anomaly"] == 1].copy()
+        for _, row in anomaly_rows.iterrows():
+            anomaly_log.append({
+                "timestamp": row["timestamp"].isoformat(),
+                "sensor": row["anomaly_type"].split("_")[0],
+                "anomaly_type": row["anomaly_type"],
+                "severity": "critical" if "spike" in row["anomaly_type"] else "warning",
+            })
+        print(f"📋 Loaded {len(anomaly_log)} historical anomaly events")
+    except Exception as e:
+        training_error = str(e)
+        print(f"❌ Training failed: {e}")
+    finally:
+        training_in_progress = False
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bootstrap()
+    thread = threading.Thread(target=bootstrap, daemon=True)
+    thread.start()
     yield
 
 
@@ -103,7 +115,7 @@ def sensor_unit(sensor: str) -> str:
 @app.get("/health")
 def health():
     return {
-        "status": "online",
+        "status": "training" if training_in_progress else ("error" if training_error else "online"),
         "model_trained": detector.state.trained,
         "data_points": len(df_global),
         "anomalies_logged": len(anomaly_log),
