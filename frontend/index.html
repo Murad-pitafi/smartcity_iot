@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEOM SmartGrid — IoT Anomaly Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #080c10;
+  --bg2: #0d1117;
+  --bg3: #131920;
+  --border: rgba(255,255,255,0.07);
+  --border-accent: rgba(0,212,170,0.3);
+  --text: #e2e8f0;
+  --text2: #6b7f91;
+  --text3: #3d5063;
+  --accent: #00d4aa;
+  --accent2: #0ea5e9;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --normal: #22c55e;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --glow: 0 0 20px rgba(0,212,170,0.15);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); overflow-x:hidden; }
+
+/* Scanline texture */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events:none; z-index:0;
+}
+
+/* Grid background */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none; z-index:0;
+}
+
+.shell { position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; }
+
+/* ── Header ── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 28px;
+  border-bottom:1px solid var(--border);
+  background: rgba(8,12,16,0.9);
+  backdrop-filter: blur(10px);
+  position:sticky; top:0; z-index:100;
+}
+.logo { display:flex; align-items:center; gap:12px; }
+.logo-mark {
+  width:32px; height:32px; border:1.5px solid var(--accent);
+  display:grid; place-items:center;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: rgba(0,212,170,0.08);
+}
+.logo-mark svg { width:16px; height:16px; stroke:var(--accent); fill:none; stroke-width:1.5; }
+.logo-text { font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:0.12em; color:var(--accent); }
+.logo-sub { font-size:10px; color:var(--text2); letter-spacing:0.08em; margin-top:1px; }
+.header-right { display:flex; align-items:center; gap:20px; }
+.live-badge {
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:0.1em;
+}
+.pulse-dot {
+  width:6px; height:6px; border-radius:50%; background:var(--accent);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+.clock { font-family:var(--mono); font-size:11px; color:var(--text2); }
+
+/* ── Main layout ── */
+main { flex:1; padding:24px 28px; display:grid; gap:20px; }
+
+/* ── Section label ── */
+.section-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:0.2em;
+  color:var(--text3); text-transform:uppercase; margin-bottom:12px;
+}
+
+/* ── Metric cards row ── */
+.metrics-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.metric-card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:2px; padding:18px 20px;
+  position:relative; overflow:hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.metric-card.anomaly {
+  border-color: var(--danger);
+  box-shadow: 0 0 24px rgba(239,68,68,0.15);
+  animation: alert-pulse 2s ease-in-out infinite;
+}
+.metric-card.warning {
+  border-color: var(--warn);
+  box-shadow: 0 0 18px rgba(245,158,11,0.12);
+}
+@keyframes alert-pulse {
+  0%,100%{box-shadow:0 0 24px rgba(239,68,68,0.15)}
+  50%{box-shadow:0 0 40px rgba(239,68,68,0.35)}
+}
+.metric-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background: var(--accent);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform 0.6s ease;
+}
+.metric-card:hover::before { transform:scaleX(1); }
+.metric-sensor { font-family:var(--mono); font-size:9px; letter-spacing:0.15em; color:var(--text3); margin-bottom:8px; }
+.metric-val { font-family:var(--mono); font-size:28px; font-weight:700; color:var(--text); line-height:1; margin-bottom:4px; }
+.metric-unit { font-size:11px; color:var(--text2); }
+.metric-status { display:flex; align-items:center; gap:6px; margin-top:10px; }
+.status-dot { width:5px; height:5px; border-radius:50%; }
+.status-text { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; }
+.metric-score { font-family:var(--mono); font-size:9px; color:var(--text3); margin-top:4px; }
+.metric-icon { position:absolute; top:16px; right:16px; opacity:0.12; font-size:28px; }
+
+/* severity colors */
+.s-normal .status-dot { background:var(--normal); }
+.s-normal .status-text { color:var(--normal); }
+.s-warning .status-dot { background:var(--warn); }
+.s-warning .status-text { color:var(--warn); }
+.s-critical .status-dot { background:var(--danger); }
+.s-critical .status-text { color:var(--danger); }
+
+/* ── Charts grid ── */
+.charts-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+.chart-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:2px; padding:20px;
+}
+.chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.chart-title { font-family:var(--mono); font-size:10px; letter-spacing:0.12em; color:var(--text2); }
+.chart-badge {
+  font-family:var(--mono); font-size:8px; padding:2px 7px;
+  border-radius:1px; letter-spacing:0.1em;
+}
+.chart-badge.ok { background:rgba(34,197,94,0.1); color:var(--normal); border:0.5px solid rgba(34,197,94,0.3); }
+.chart-badge.alert { background:rgba(239,68,68,0.1); color:var(--danger); border:0.5px solid rgba(239,68,68,0.3); }
+.chart-badge.warn { background:rgba(245,158,11,0.1); color:var(--warn); border:0.5px solid rgba(245,158,11,0.3); }
+.chart-wrap { height:160px; position:relative; }
+
+/* ── Bottom row ── */
+.bottom-row { display:grid; grid-template-columns:1fr 340px; gap:14px; }
+
+/* Anomaly log */
+.anomaly-log { background:var(--bg2); border:1px solid var(--border); border-radius:2px; padding:20px; }
+.log-list { display:flex; flex-direction:column; gap:6px; max-height:240px; overflow-y:auto; }
+.log-list::-webkit-scrollbar { width:3px; }
+.log-list::-webkit-scrollbar-track { background:transparent; }
+.log-list::-webkit-scrollbar-thumb { background:var(--border-accent); border-radius:2px; }
+.log-entry {
+  display:grid; grid-template-columns:90px 1fr auto;
+  align-items:center; gap:10px;
+  padding:8px 10px;
+  background:var(--bg3); border:0.5px solid var(--border);
+  border-radius:1px; font-family:var(--mono); font-size:9px;
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.log-time { color:var(--text3); }
+.log-sensor { color:var(--text2); }
+.log-sev { padding:1px 5px; border-radius:1px; font-size:8px; }
+.log-sev.critical { background:rgba(239,68,68,0.15); color:var(--danger); }
+.log-sev.warning { background:rgba(245,158,11,0.15); color:var(--warn); }
+
+/* Stats panel */
+.stats-panel { background:var(--bg2); border:1px solid var(--border); border-radius:2px; padding:20px; }
+.stat-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:0.5px solid var(--border); }
+.stat-row:last-child { border-bottom:none; }
+.stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.1em; }
+.stat-val { font-family:var(--mono); font-size:12px; color:var(--text); font-weight:700; }
+
+/* ── Score bar ── */
+.score-bar { margin-top:8px; }
+.score-track { height:2px; background:var(--bg3); border-radius:1px; overflow:hidden; }
+.score-fill { height:100%; border-radius:1px; transition:width 0.8s ease; }
+
+/* ── Footer ── */
+footer {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 28px; border-top:1px solid var(--border);
+  font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em;
+}
+.btn-retrain {
+  font-family:var(--mono); font-size:9px; letter-spacing:0.1em;
+  padding:5px 14px; background:transparent;
+  border:0.5px solid var(--border-accent); color:var(--accent);
+  cursor:pointer; transition:background 0.2s;
+}
+.btn-retrain:hover { background:rgba(0,212,170,0.08); }
+.btn-retrain:disabled { opacity:0.4; cursor:not-allowed; }
+
+.no-data { font-family:var(--mono); font-size:10px; color:var(--text3); text-align:center; padding:20px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 16 16"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5"/><line x1="8" y1="1" x2="8" y2="15"/><line x1="1" y1="5" x2="15" y2="11"/><line x1="15" y1="5" x2="1" y2="11"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">SMARTGRID//NEOM</div>
+      <div class="logo-sub">IOT ANOMALY INTELLIGENCE LAYER · V1.0</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="pulse-dot"></div>LIVE STREAM</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Sensor metric cards -->
+  <div>
+    <div class="section-label">// sensor_feeds — realtime</div>
+    <div class="metrics-row" id="metrics-row">
+      <div class="metric-card"><div class="no-data">Initializing LSTM models…</div></div>
+      <div class="metric-card"></div>
+      <div class="metric-card"></div>
+      <div class="metric-card"></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div>
+    <div class="section-label">// time_series — last 200 readings</div>
+    <div class="charts-grid" id="charts-grid">
+      <div class="chart-card"><div class="no-data">Loading…</div></div>
+      <div class="chart-card"><div class="no-data">Loading…</div></div>
+      <div class="chart-card"><div class="no-data">Loading…</div></div>
+      <div class="chart-card"><div class="no-data">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="bottom-row">
+    <div class="anomaly-log">
+      <div class="section-label">// anomaly_event_log</div>
+      <div class="log-list" id="log-list">
+        <div class="no-data">Awaiting anomaly events…</div>
+      </div>
+    </div>
+    <div class="stats-panel">
+      <div class="section-label">// system_metrics</div>
+      <div id="stats-list">
+        <div class="no-data">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>MUHAMMAD MURAD · AI/ML ENGINEER · AGRIENGINEERING 2026</span>
+  <button class="btn-retrain" id="btn-retrain" onclick="retrain()">⟳ RETRAIN MODELS</button>
+  <span id="footer-status">CONNECTING…</span>
+</footer>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const SENSOR_ICONS = {
+  temperature: '🌡',
+  vibration: '📳',
+  energy_kwh: '⚡',
+  air_quality_pm25: '🌫',
+};
+const SENSOR_COLORS = {
+  temperature: '#f97316',
+  vibration: '#a855f7',
+  energy_kwh: '#0ea5e9',
+  air_quality_pm25: '#22c55e',
+};
+
+let charts = {};
+let chartData = {};
+let liveInterval = null;
+let historyLoaded = false;
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', {hour12:false});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Charts ─────────────────────────────────────────────────────────────────
+function buildChart(canvasId, sensor, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Value',
+          data: [],
+          borderColor: color,
+          backgroundColor: color + '18',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: 'Anomaly',
+          data: [],
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(239,68,68,0.7)',
+          pointRadius: 5,
+          pointStyle: 'rectRot',
+          showLine: false,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      scales: {
+        x: {
+          display: false,
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: { color: '#3d5063', font: { family: 'Space Mono', size: 8 }, maxTicksLimit: 5 },
+          border: { display: false },
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#131920',
+          borderColor: '#ffffff12',
+          borderWidth: 1,
+          titleColor: '#6b7f91',
+          bodyColor: '#e2e8f0',
+          titleFont: { family: 'Space Mono', size: 9 },
+          bodyFont: { family: 'Space Mono', size: 10 },
+        }
+      }
+    }
+  });
+}
+
+function initCharts(sensors) {
+  const grid = document.getElementById('charts-grid');
+  grid.innerHTML = '';
+  sensors.forEach(s => {
+    const color = SENSOR_COLORS[s] || '#00d4aa';
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `
+      <div class="chart-header">
+        <span class="chart-title">${s.toUpperCase().replace('_',' ')}</span>
+        <span class="chart-badge ok" id="badge-${s}">NOMINAL</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-${s}"></canvas></div>
+    `;
+    grid.appendChild(card);
+    charts[s] = buildChart(`chart-${s}`, s, color);
+    chartData[s] = { labels: [], values: [], anomalies: [] };
+  });
+}
+
+function updateChart(sensor, timestamps, values, anomalyFlags) {
+  const chart = charts[sensor];
+  if (!chart) return;
+  const labels = timestamps.map(t => t.slice(11,19));
+  const anomalyPoints = values.map((v, i) => anomalyFlags[i] ? v : null);
+
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = values;
+  chart.data.datasets[1].data = anomalyPoints;
+  chart.update('none');
+}
+
+// ── Metric cards ───────────────────────────────────────────────────────────
+function renderMetrics(readings) {
+  const row = document.getElementById('metrics-row');
+  row.innerHTML = '';
+  readings.forEach(r => {
+    const sev = r.severity;
+    const card = document.createElement('div');
+    card.className = `metric-card ${sev === 'critical' ? 'anomaly' : sev === 'warning' ? 'warning' : ''}`;
+    const scoreRatio = r.threshold > 0 ? Math.min(1, r.anomaly_score / r.threshold) : 0;
+    const fillColor = sev === 'critical' ? '#ef4444' : sev === 'warning' ? '#f59e0b' : '#00d4aa';
+    card.innerHTML = `
+      <div class="metric-sensor">${r.sensor.toUpperCase().replace(/_/g,' ')}</div>
+      <div class="metric-val">${r.value}<span class="metric-unit"> ${r.unit}</span></div>
+      <div class="metric-status s-${sev}">
+        <div class="status-dot"></div>
+        <div class="status-text">${sev.toUpperCase()}</div>
+      </div>
+      <div class="score-bar">
+        <div class="score-track">
+          <div class="score-fill" style="width:${scoreRatio*100}%;background:${fillColor};"></div>
+        </div>
+      </div>
+      <div class="metric-score">LSTM SCORE: ${r.anomaly_score.toFixed(4)} / THR: ${r.threshold.toFixed(4)}</div>
+      <div class="metric-icon">${SENSOR_ICONS[r.sensor] || '◈'}</div>
+    `;
+    row.appendChild(card);
+
+    // Update chart badge
+    const badge = document.getElementById(`badge-${r.sensor}`);
+    if (badge) {
+      badge.className = `chart-badge ${sev === 'critical' ? 'alert' : sev === 'warning' ? 'warn' : 'ok'}`;
+      badge.textContent = sev === 'critical' ? '⚠ ANOMALY' : sev === 'warning' ? '! WARNING' : 'NOMINAL';
+    }
+  });
+}
+
+// ── Anomaly log ────────────────────────────────────────────────────────────
+function renderLog(anomalies) {
+  const list = document.getElementById('log-list');
+  if (!anomalies.length) {
+    list.innerHTML = '<div class="no-data">No anomalies detected</div>';
+    return;
+  }
+  list.innerHTML = anomalies.slice(0, 15).map(a => `
+    <div class="log-entry">
+      <span class="log-time">${a.timestamp.slice(11,19)}</span>
+      <span class="log-sensor">${(a.anomaly_type || a.sensor).toUpperCase().replace(/_/g,' ')}</span>
+      <span class="log-sev ${a.severity}">${a.severity.toUpperCase()}</span>
+    </div>
+  `).join('');
+}
+
+// ── Stats panel ────────────────────────────────────────────────────────────
+function renderStats(data) {
+  const el = document.getElementById('stats-list');
+  el.innerHTML = `
+    <div class="stat-row"><span class="stat-label">DATA POINTS</span><span class="stat-val">${data.total_anomalies || 0} events</span></div>
+    <div class="stat-row"><span class="stat-label">MODEL</span><span class="stat-val">LSTM AUTOENC.</span></div>
+    <div class="stat-row"><span class="stat-label">WINDOW</span><span class="stat-val">20 STEPS</span></div>
+    <div class="stat-row"><span class="stat-label">THRESHOLD</span><span class="stat-val">μ + 2.5σ</span></div>
+    <div class="stat-row"><span class="stat-label">SENSORS</span><span class="stat-val">4 ACTIVE</span></div>
+    <div class="stat-row"><span class="stat-label">UPDATE</span><span class="stat-val">3s INTERVAL</span></div>
+  `;
+}
+
+// ── API calls ──────────────────────────────────────────────────────────────
+async function fetchLive() {
+  try {
+    const [liveRes, logRes] = await Promise.all([
+      fetch(`${API}/sensors/live`),
+      fetch(`${API}/anomalies/recent?limit=15`),
+    ]);
+    if (!liveRes.ok) return;
+    const live = await liveRes.json();
+    const log = await logRes.json();
+
+    if (live.error) {
+      document.getElementById('footer-status').textContent = live.error;
+      return;
+    }
+
+    if (!historyLoaded && live.readings?.length) {
+      initCharts(live.readings.map(r => r.sensor));
+      await fetchHistory();
+      historyLoaded = true;
+    }
+
+    renderMetrics(live.readings || []);
+    renderLog(log.anomalies || []);
+    renderStats(live);
+    document.getElementById('footer-status').textContent =
+      `LAST UPDATE: ${new Date().toLocaleTimeString('en-GB',{hour12:false})} UTC`;
+
+  } catch(e) {
+    document.getElementById('footer-status').textContent = 'API OFFLINE — run: uvicorn backend.main:app';
+  }
+}
+
+async function fetchHistory() {
+  try {
+    const res = await fetch(`${API}/sensors/history?n=200`);
+    if (!res.ok) return;
+    const data = await res.json();
+    Object.entries(data.sensors).forEach(([sensor, info]) => {
+      updateChart(sensor, info.timestamps, info.values, info.anomaly_flags);
+    });
+  } catch(e) {}
+}
+
+async function retrain() {
+  const btn = document.getElementById('btn-retrain');
+  btn.disabled = true;
+  btn.textContent = '⟳ RETRAINING…';
+  historyLoaded = false;
+  try {
+    await fetch(`${API}/train`, {method:'POST'});
+    await fetchHistory();
+  } catch(e) {}
+  btn.disabled = false;
+  btn.textContent = '⟳ RETRAIN MODELS';
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+fetchLive();
+liveInterval = setInterval(fetchLive, 3000);
+setInterval(fetchHistory, 15000);
+</script>
+</body>
+</html>
