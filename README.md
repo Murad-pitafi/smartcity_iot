@@ -90,17 +90,6 @@ git push origin main
 curl http://localhost:8000/sensors/live | python -m json.tool
 ```
 
----
-
-## 🚀 Deploy Free on Railway
-
-1. Push this repo to GitHub
-2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
-3. Railway auto-detects `Dockerfile` and deploys
-4. Update `API` variable in `frontend/index.html` to your Railway URL
-5. Host `index.html` on GitHub Pages (free)
-
-**That's it — fully deployed, zero cost.**
 
 ---
 
@@ -151,6 +140,5 @@ Severity: normal / warning / critical
 ## © Copyright & License
 
 - **Copyright** (c) 2026 Muhammad Murad (Murad-pitafi). All rights reserved by the author.
-- This repository may include third-party open-source components; those components remain subject to their own licenses.
-- If you would like to make this project open-source under a permissive license (e.g. MIT, Apache-2.0) I can add a `LICENSE` file — tell me which license you prefer.
+- This repository may include third-party open-source components; those components remain subject to their own licenses. 
 
