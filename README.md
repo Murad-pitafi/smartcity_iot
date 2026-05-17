@@ -145,3 +145,12 @@ Severity: normal / warning / critical
 - LinkedIn: [linkedin.com/in/murad-pitafi](https://linkedin.com/in/murad-pitafi)
 - GitHub: [github.com/murad-pitafi](https://github.com/murad-pitafi)
 - Paper: Agentic AI Framework for Smart Agriculture — AgriEngineering, vol. 8, Jan 2026
+
+---
+
+## © Copyright & License
+
+- **Copyright** (c) 2026 Muhammad Murad (Murad-pitafi). All rights reserved by the author.
+- This repository may include third-party open-source components; those components remain subject to their own licenses.
+- If you would like to make this project open-source under a permissive license (e.g. MIT, Apache-2.0) I can add a `LICENSE` file — tell me which license you prefer.
+
